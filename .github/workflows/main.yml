@@ -1,44 +1,41 @@
-yamlname: Azule Self Build IPA
-
+name: Pyzule Build IPA
 on:
-  workflow_dispatch: # 手動でビルドを実行できるようにするトリガー
+  workflow_dispatch:
     inputs:
       ipa_url:
-        description: 'ダウンロード可能な未加工のIPAファイルの直リンクURL'
+        description: '元のIPAファイルのURL'
         required: true
       tweak_url:
-        description: '注入したい Tweak（.debファイル）の直リンクURL'
+        description: '合体させたいTweak（.deb等）のURL'
         required: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: リポジトリのチェックアウト
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: 依存関係（Azule本体）のセットアップ
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y zip unzip
-          git clone https://github.com
-          cd Azule
-          sudo ./install.sh
-          cd ..
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
 
-      - name: ファイルのダウンロード
+      - name: Install Pyzule
         run: |
-          curl -L "${{ github.event.inputs.ipa_url }}" -o original.ipa
+          pip install pyzule-rw || pip install pyzule
+
+      - name: Download Files
+        run: |
+          curl -L "${{ github.event.inputs.ipa_url }}" -o app.ipa
           curl -L "${{ github.event.inputs.tweak_url }}" -o tweak.deb
 
-      - name: AzuleによるTweak注入処理
+      - name: Merge Files
         run: |
-          # azuleコマンドを使って結合。-i = 入力IPA, -f = 注入するdeb, -o = 出力先
-          azule -i original.ipa -f tweak.deb -o ./output/
+          pyzule -i app.ipa -o output.ipa -f tweak.deb
 
-      - name: 成果物（加工済みIPA）のアップロード
-        uses: actions/artifacts-upload@v4
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
         with:
-          name: Tweaked-IPA
-          path: output/*.ipa
+          name: Merged-IPA
+          path: output.ipa
