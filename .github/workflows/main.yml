@@ -1,0 +1,44 @@
+yamlname: Azule Self Build IPA
+
+on:
+  workflow_dispatch: # 手動でビルドを実行できるようにするトリガー
+    inputs:
+      ipa_url:
+        description: 'ダウンロード可能な未加工のIPAファイルの直リンクURL'
+        required: true
+      tweak_url:
+        description: '注入したい Tweak（.debファイル）の直リンクURL'
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: リポジトリのチェックアウト
+        uses: actions/checkout@v4
+
+      - name: 依存関係（Azule本体）のセットアップ
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zip unzip
+          git clone https://github.com
+          cd Azule
+          sudo ./install.sh
+          cd ..
+
+      - name: ファイルのダウンロード
+        run: |
+          curl -L "${{ github.event.inputs.ipa_url }}" -o original.ipa
+          curl -L "${{ github.event.inputs.tweak_url }}" -o tweak.deb
+
+      - name: AzuleによるTweak注入処理
+        run: |
+          # azuleコマンドを使って結合。-i = 入力IPA, -f = 注入するdeb, -o = 出力先
+          azule -i original.ipa -f tweak.deb -o ./output/
+
+      - name: 成果物（加工済みIPA）のアップロード
+        uses: actions/artifacts-upload@v4
+        with:
+          name: Tweaked-IPA
+          path: output/*.ipa
